@@ -1,160 +1,219 @@
-# Flask-SQLAlchemy Lab 2
+
+# Flask-SQLAlchemy Lab 2: Customer-Item Review System
 
 ## Learning Goals
+In this lab, you will learn to:
+- Use **Flask-SQLAlchemy** to define a data model with relationships.
+- Implement an **association proxy** for a model.
+- Use **SQLAlchemy-Serializer** to serialize an object with relationships.
 
-- Use Flask-SQLAlchemy to define a data model with relationships
-- Implement an association proxy for a model
-- Use SQLAlchemy-Serializer to serialize an object with relationships
+## Setup Instructions
 
----
+### 1. **Fork and Clone the Repository**
+- Fork the lab repository on GitHub.
+- Clone the forked repository to your local machine:
+  ```bash
+  git clone https://github.com/learn-co-curriculum/python-p4-v2-flask-sqlalchemy-lab-2
+  cd python-p4-v2-flask-sqlalchemy-lab-2
+  ```
 
-## Setup
+### 2. **Install Dependencies with Pipenv**
+- If you don't have `pipenv` installed, install it globally:
+  ```bash
+  pip install pipenv
+  ```
 
-Fork and clone the lab repo.
+- Inside your project folder, install the required dependencies:
+  ```bash
+  pipenv install
+  ```
 
-Run `pipenv install` and `pipenv shell` .
+- Activate the virtual environment:
+  ```bash
+  pipenv shell
+  ```
 
-```console
-$ pipenv install
-$ pipenv shell
+### 3. **Setup the Flask Application**
+
+- Navigate to the `server` directory:
+  ```bash
+  cd server
+  ```
+
+- Initialize Flask-Migrate to handle database migrations:
+  ```bash
+  flask db init
+  ```
+
+- Create the initial migration:
+  ```bash
+  flask db migrate -m "initial migration"
+  ```
+
+- Apply the migration to the database:
+  ```bash
+  flask db upgrade head
+  ```
+
+## Task #1: Add Review and Relationships with Customer and Item
+
+### 1. **Modify `models.py` to Add the `Review` Model**
+
+In `server/models.py`, add the `Review` model with the following attributes:
+- A `comment` column.
+- `customer_id` and `item_id` foreign key columns linking to `customers` and `items`, respectively.
+
+```python
+class Review(db.Model):
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
+    comment = db.Column(db.String)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'))
+
+    customer = db.relationship('Customer', back_populates='reviews')
+    item = db.relationship('Item', back_populates='reviews')
 ```
 
-Change into the `server` directory:
+### 2. **Update the `Customer` and `Item` Models**
 
-```console
-$ cd server
+Add relationships to `Customer` and `Item` models:
+```python
+class Customer(db.Model):
+    __tablename__ = 'customers'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    reviews = db.relationship('Review', back_populates='customer')
+
+class Item(db.Model):
+    __tablename__ = 'items'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    price = db.Column(db.Float)
+    reviews = db.relationship('Review', back_populates='item')
 ```
 
-The file `server/models.py` defines models named `Customer` and `Item`.
+### 3. **Run Migrations**
 
-Run the following commands to create the tables for customers and items.
-
-```console
-$ flask db init
-$ flask db migrate -m "initial migration"
-$ flask db upgrade head
+After making the changes, perform a migration to add the `Review` model:
+```bash
+flask db migrate -m 'add review'
+flask db upgrade head
 ```
 
-## Task#1 : Add Review and relationships with Customer and Item
+### 4. **Test the Review Model**
 
-![customer review item erd](https://curriculum-content.s3.amazonaws.com/7159/python-p4-v2-flask-sqlalchemy/sqlalchemy_lab_2_erd.png)
-
-A customer can review an item that they purchased.
-
-- A review **belongs to** an customer.
-- A review **belongs to** an item.
-- A customer **has many** items **through** reviews.
-- An item **has many** customers **through** reviews.
-
-Edit `server/models.py` to add a new model class named `Review` that inherits
-from `db.Model`. Add the following attributes to the `Review` model:
-
-- a string named `__tablename__` assigned to the value `'reviews'`.
-- a column named `id` to store an integer that is the primary key.
-- a column named `comment` to store a string.
-- a column named `customer_id` that is a foreign key to the `'customers'` table.
-- a column named `item_id` that is a foreign key to the `'items'` table.
-- a relationship named `customer` that establishes a relationship with the
-  `Customer` model. Assign the `back_populates` parameter to match the property
-  name defined to the reciprocal relationship in `Customer`.
-- a relationship named `item` that establishes a relationship with the `Item`
-  model. Assign the `back_populates` parameter to match the property name
-  defined to the reciprocal relationship in `Item`.
-
-Edit the `Customer` model to add the following:
-
-- a relationship named `reviews` that establishes a relationship with the
-  `Review` model. Assign the `back_populates` parameter to match the property
-  name defined to the reciprocal relationship in `Review`.
-
-Edit the `Item` model to add the following:
-
-- a relationship named `reviews` that establishes a relationship with the
-  `Review` model. Assign the `back_populates` parameter to match the property
-  name defined to the reciprocal relationship in `Review`.
-
-Save `server/models.py`. Make sure you are in the `server` directory, then type
-the following to perform a migration to add the new model:
-
-```console
-$ flask db migrate -m 'add review'
-$ flask db upgrade head
+Run the tests for the `Review` model in `testing/review_test.py`:
+```bash
+pytest testing/review_test.py
 ```
 
-Test the new `Review` model class and relationships:
+If the tests pass, proceed with seeding data.
 
-```console
-$ pytest testing/review_test.py
+### 5. **Seed the Database**
+
+To populate the database with sample data, run:
+```bash
+python seed.py
 ```
 
-The 4 tests should pass. If not, update your `Review` model to pass the tests
-before proceeding.
-
-Run `server/seed.py` to add sample customers, items, and reviews to the
-database.
-
-```
-$ python seed.py
-```
-
-Then use either Flask shell or SQLite Viewer to confirm the 3 tables are
-populated with the seed data.
+Verify the data is populated by using Flask shell or an SQLite viewer.
 
 ## Task #2: Add Association Proxy
 
-Given a customer, we might want to get a list of items they've reviewed.
-Currently, you would need to iterate through the customer's reviews to get each
-item. Try this in the Flask shell:
+### 1. **Update the `Customer` Model**
 
-```py
->>> from models import *
->>> customer1 = Customer.query.filter_by(id=1).first()
->>> customer1
-<Customer 1, Tal Yuri>
->>> items = [review.item for review in customer1.reviews]
->>> items
-[<Item 1, Laptop Backpack, 49.99>, <Item 2, Insulated Coffee Mug, 9.99>]
->>>
+Add an **association proxy** to the `Customer` model for accessing items through reviews:
+```python
+from sqlalchemy.ext.associationproxy import association_proxy
+
+class Customer(db.Model):
+    __tablename__ = 'customers'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    reviews = db.relationship('Review', back_populates='customer')
+    items = association_proxy('reviews', 'item')
 ```
 
-Update `Customer` to add an association proxy named `items` to get a list of
-items through the customer's `reviews` relationship.
+### 2. **Test the Association Proxy**
 
-Once you've defined the association proxy, you can easily get the items for a
-customer as:
-
-```py
->>> customer1.items
-[<Item 1, Laptop Backpack, 49.99>, <Item 2, Insulated Coffee Mug, 9.99>]
-```
-
-Test the updated `Customer` model and association proxy:
-
-```console
-$ pytest testing/association_proxy_test.py
+Run the tests for the association proxy in `testing/association_proxy_test.py`:
+```bash
+pytest testing/association_proxy_test.py
 ```
 
 ## Task #3: Add Serialization
 
-- Edit `Customer`, `Item`, and `Reviews` to inherit from `SerializerMixin`.
-- Add serialization rules to avoid errors involving recursion depth (be careful
-  about tuple commas).
-  - `Customer` should exclude `reviews.customer`
-  - `Item` should exclude `reviews.item`
-  - `Review` should exclude `customer.reviews` and `item.reviews`
+### 1. **Implement Serialization for Customer, Item, and Review Models**
 
-Test the serialized models:
+Use `SerializerMixin` to make the models serializable and avoid recursion issues:
+```python
+from sqlalchemy_serializer import SerializerMixin
 
-```console
-$ pytest testing/serialization_test.py
+class Customer(db.Model, SerializerMixin):
+    __tablename__ = 'customers'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    reviews = db.relationship('Review', back_populates='customer')
+    items = association_proxy('reviews', 'item')
+    serialize_rules = ('-reviews.customer',)
+
+class Item(db.Model, SerializerMixin):
+    __tablename__ = 'items'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    price = db.Column(db.Float)
+    reviews = db.relationship('Review', back_populates='item')
+    serialize_rules = ('-reviews.item',)
+
+class Review(db.Model, SerializerMixin):
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
+    comment = db.Column(db.String)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'))
+    customer = db.relationship('Customer', back_populates='reviews')
+    item = db.relationship('Item', back_populates='reviews')
+    serialize_rules = ('-customer.reviews', '-item.reviews')
 ```
 
-Run all tests to ensure they pass:
+### 2. **Test Serialization**
 
-```console
-$ pytest
+Run the serialization tests in `testing/serialization_test.py`:
+```bash
+pytest testing/serialization_test.py
 ```
 
-Once all tests are passing, commit and push your work using `git` to submit.
+## Final Testing
+
+### 1. **Run All Tests**
+
+To ensure everything works as expected, run all tests:
+```bash
+pytest
+```
+
+This will run all the tests in the project, ensuring that the relationships, association proxies, and serialization are correctly implemented.
 
 ---
+
+## Folder Structure
+
+```
+repository-name/
+├── server/
+│   ├── models.py
+│   ├── app.py
+│   ├── seed.py
+│   └── __init__.py
+├── testing/
+│   ├── association_proxy_test.py
+│   ├── review_test.py
+│   ├── serialization_test.py
+│   ├── conftest.py
+│   └── __init__.py
+├── Pipfile
+├── Pipfile.lock
+├── pytest.ini
+└── README.md
+```
